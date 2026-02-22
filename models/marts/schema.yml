@@ -1,0 +1,322 @@
+version: 2
+
+models:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # dim_customers
+  #
+  # DATA CONTRACT: enforced = true
+  # This model's schema is a public interface for BI tools and downstream
+  # models. Any deviation from the declared columns/types will cause a
+  # BUILD FAILURE (not just a test failure).
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: dim_customers
+    description: >
+      SCD Type 2 customer dimension. Each row represents one historical version
+      of a customer record. The is_current flag identifies the active row.
+    config:
+      contract:
+        enforced: true            # ← Contract enforcement ON
+
+    columns:
+      - name: customer_id
+        description: Business key for the customer.
+        data_type: integer
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - unique
+
+      - name: current_name
+        description: Customer name as of this record version.
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+      - name: customer_type
+        description: Segment — Individual, Corporate, or SME.
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Individual', 'Corporate', 'SME']
+
+      - name: region
+        description: Geographic region.
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['North', 'South', 'East', 'West']
+
+      - name: valid_from
+        description: Start of this SCD row's validity period.
+        data_type: timestamp
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+      - name: valid_to
+        description: End of validity (NULL = currently active row).
+        data_type: timestamp
+
+      - name: is_current
+        description: True if this is the currently active version of the customer.
+        data_type: boolean
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # dim_accounts
+  #
+  # DATA CONTRACT: enforced = true
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: dim_accounts
+    description: >
+      SCD Type 2 chart-of-accounts dimension. Each row is one versioned state
+      of a financial account. is_active identifies the currently live record.
+    config:
+      contract:
+        enforced: true
+
+    columns:
+      - name: account_id
+        description: Business key for the account.
+        data_type: integer
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - unique
+
+      - name: account_code
+        description: Human-readable code (e.g. ACCT-1001).
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+      - name: account_name
+        description: Descriptive account name.
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+      - name: account_type
+        description: High-level double-entry classification.
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense']
+
+      - name: account_category
+        description: Subcategory of account_type.
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Fixed Assets'
+                  - 'Current Assets'
+                  - 'Current Liabilities'
+                  - 'Long-term Liabilities'
+                  - "Owner's Equity"
+                  - 'Operating Revenue'
+                  - 'Non-Operating Revenue'
+                  - 'Operating Expense'
+                  - 'Tax Expense'
+
+      - name: valid_from
+        description: Start of this SCD row's validity period.
+        data_type: timestamp
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+      - name: valid_to
+        description: End of validity (NULL = currently active row).
+        data_type: timestamp
+
+      - name: is_active
+        description: True if this is the currently active version of the account.
+        data_type: boolean
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # dim_organizations
+  #
+  # DATA CONTRACT: enforced = true
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: dim_organizations
+    description: >
+      Static organisation / cost-centre dimension. Represents internal legal
+      entities and cost centres against which transactions are coded.
+    config:
+      contract:
+        enforced: true
+
+    columns:
+      - name: org_id
+        description: Unique identifier for the organisation.
+        data_type: integer
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - unique
+
+      - name: cost_center_code
+        description: Coded identifier for the cost centre.
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - unique
+
+      - name: cost_center_name
+        description: Human-readable cost centre name.
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+      - name: entity_name
+        description: Legal entity this cost centre belongs to.
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # fct_ledger_entries
+  #
+  # DATA CONTRACT: enforced = true
+  # This is the primary fact table. BI tools, financial reports, and
+  # downstream aggregations depend on this schema being stable.
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: fct_ledger_entries
+    description: >
+      Core financial fact table. One row per ledger transaction event.
+      Each transaction links to a chart-of-accounts entry (account_id),
+      a customer (customer_id), and a cost centre (org_id).
+      Amounts can be positive (credits) or negative (debits).
+    config:
+      contract:
+        enforced: true
+
+    columns:
+      - name: transaction_id
+        description: Unique surrogate key for each ledger entry.
+        data_type: integer
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - unique
+
+      - name: account_id
+        description: FK → dim_accounts.account_id
+        data_type: integer
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_accounts')
+                field: account_id
+
+      - name: customer_id
+        description: FK → dim_customers.customer_id
+        data_type: integer
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+
+      - name: org_id
+        description: FK → dim_organizations.org_id
+        data_type: integer
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_organizations')
+                field: org_id
+
+      - name: transaction_date
+        description: Date the financial transaction occurred.
+        data_type: date
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+      - name: transaction_year_month
+        description: Year-month from dim_dates (e.g. 2024-05) for reporting; NULL if date outside spine.
+        data_type: varchar
+
+      - name: amount
+        description: >
+          Monetary value of the transaction in the stated currency.
+          Must never be zero — zero-value entries indicate a data quality issue.
+        data_type: decimal(18,2)
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+      - name: currency_code
+        description: ISO 4217 currency code (e.g. USD, EUR, GBP).
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+
+      - name: description
+        description: Free-text narration of the transaction (may be null).
+        data_type: varchar
+
+      - name: created_at
+        description: Timestamp when the record was ingested from the source system.
+        data_type: timestamp
+        constraints:
+          - type: not_null
+        tests:
+          - not_null

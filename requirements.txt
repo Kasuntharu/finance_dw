@@ -1,0 +1,11 @@
+# Finance DW — development requirements (dbt + DuckDB)
+# Install: pip install -r requirements.txt
+
+# dbt Core (required explicitly when using dbt-duckdb 1.8+)
+dbt-core>=1.7,<3
+
+# DuckDB adapter for dbt
+dbt-duckdb>=1.8
+
+# Optional: DuckDB for local Python scripts or tooling
+duckdb>=0.10

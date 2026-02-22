@@ -1,0 +1,40 @@
+name: 'finance_dw'
+version: '1.0.0'
+config-version: 2
+
+profile: 'finance_dw'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# -----------------------------------------------------------------------------
+# Medallion architecture (DuckDB)
+#   raw       → Bronze: source-aligned, ingestion (seeds / external load)
+#   snapshots → Silver: SCD2 history (snapshot config)
+#   silver    → Silver: staging + intermediate
+#   gold      → Gold: marts (facts & dimensions)
+# -----------------------------------------------------------------------------
+
+seeds:
+  finance_dw:
+    +schema: raw
+
+models:
+  finance_dw:
+    staging:
+      +materialized: view
+      +schema: silver
+    intermediate:
+      +materialized: ephemeral
+      +schema: silver
+    marts:
+      +materialized: table
+      +schema: gold

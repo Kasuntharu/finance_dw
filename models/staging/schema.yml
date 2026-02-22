@@ -1,0 +1,210 @@
+version: 2
+
+models:
+
+  # ─────────────────────────────────────────────────
+  # stg_customers
+  # Source: customers_snapshot (SCD Type 2)
+  # ─────────────────────────────────────────────────
+  - name: stg_customers
+    description: >
+      Staged customer records sourced from the SCD Type 2 snapshot.
+      Each row represents one version of a customer record (historical + current).
+    columns:
+      - name: customer_id
+        description: Surrogate business key for a customer.
+        tests:
+          - not_null
+          - unique
+
+      - name: customer_name
+        description: Full name of the customer.
+        tests:
+          - not_null
+
+      - name: customer_type
+        description: Classification of the customer segment.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Individual', 'Corporate', 'SME']
+
+      - name: region
+        description: Geographic region the customer belongs to.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['North', 'South', 'East', 'West']
+
+      - name: updated_at
+        description: Timestamp of the last update in the source system.
+        tests:
+          - not_null
+
+      - name: valid_from
+        description: Start of validity window for this SCD row (from dbt_valid_from).
+        tests:
+          - not_null
+
+      - name: valid_to
+        description: End of validity window (NULL means currently active record).
+
+  # ─────────────────────────────────────────────────
+  # stg_accounts
+  # Source: accounts_snapshot (SCD Type 2)
+  # ─────────────────────────────────────────────────
+  - name: stg_accounts
+    description: >
+      Staged chart-of-accounts records sourced from the SCD Type 2 snapshot.
+      Each row is one versioned state of a financial account.
+    columns:
+      - name: account_id
+        description: Surrogate business key for a chart-of-accounts entry.
+        tests:
+          - not_null
+          - unique
+
+      - name: account_code
+        description: Human-readable account code (e.g. ACCT-1001).
+        tests:
+          - not_null
+          - unique
+
+      - name: account_name
+        description: Descriptive name of the account.
+        tests:
+          - not_null
+
+      - name: account_type
+        description: High-level type per double-entry bookkeeping (Asset, Liability, etc.).
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense']
+
+      - name: account_category
+        description: Subcategory of the account type.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Fixed Assets'
+                  - 'Current Assets'
+                  - 'Current Liabilities'
+                  - 'Long-term Liabilities'
+                  - "Owner's Equity"
+                  - 'Operating Revenue'
+                  - 'Non-Operating Revenue'
+                  - 'Operating Expense'
+                  - 'Tax Expense'
+
+      - name: valid_from
+        description: Start of validity window (from dbt_valid_from).
+        tests:
+          - not_null
+
+      - name: valid_to
+        description: End of validity window (NULL means currently active record).
+
+  # ─────────────────────────────────────────────────
+  # stg_transactions
+  # Source: raw_transactions (finance_source)
+  # ─────────────────────────────────────────────────
+  - name: stg_transactions
+    description: >
+      Staged financial transaction records from the raw source.
+      Each row is a single ledger event (debit or credit) associated
+      with an account, customer, and organisation.
+    columns:
+      - name: transaction_id
+        description: Unique identifier for each transaction.
+        tests:
+          - not_null
+          - unique
+
+      - name: account_id
+        description: Foreign key to stg_accounts.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_accounts')
+                field: account_id
+
+      - name: customer_id
+        description: Foreign key to stg_customers.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+
+      - name: org_id
+        description: Foreign key to stg_organizations.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_organizations')
+                field: org_id
+
+      - name: transaction_date
+        description: Calendar date on which the transaction occurred.
+        tests:
+          - not_null
+
+      - name: amount
+        description: Monetary value of the transaction (positive = credit, negative = debit).
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "amount != 0"
+              config:
+                alias: stg_transactions_amount_not_zero
+
+      - name: currency_code
+        description: ISO 4217 currency code (e.g. USD, EUR).
+        tests:
+          - not_null
+
+      - name: created_at
+        description: Timestamp when the record was first created in the source system.
+        tests:
+          - not_null
+
+  # ─────────────────────────────────────────────────
+  # stg_organizations
+  # Source: raw_organizations (finance_source)
+  # ─────────────────────────────────────────────────
+  - name: stg_organizations
+    description: >
+      Staged organisation/cost-centre dimension records.
+      Represents internal legal entities and cost centres.
+    columns:
+      - name: org_id
+        description: Unique identifier for an organisation / cost centre.
+        tests:
+          - not_null
+          - unique
+
+      - name: cost_center_code
+        description: Coded identifier for the cost centre (e.g. CC-101).
+        tests:
+          - not_null
+          - unique
+
+      - name: cost_center_name
+        description: Human-readable name of the cost centre.
+        tests:
+          - not_null
+
+      - name: entity_name
+        description: Legal entity name this cost centre belongs to.
+        tests:
+          - not_null

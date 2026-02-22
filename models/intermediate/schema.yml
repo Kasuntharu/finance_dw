@@ -1,0 +1,68 @@
+version: 2
+
+models:
+
+  # ─────────────────────────────────────────────────
+  # int_transactions_enriched
+  # Joins stg_transactions ← stg_accounts
+  # ─────────────────────────────────────────────────
+  - name: int_transactions_enriched
+    description: >
+      Transactions enriched with account metadata (account_type and account_category)
+      via a LEFT JOIN to stg_accounts. One row per transaction.
+      Used as the primary input to fct_ledger_entries and downstream marts.
+    columns:
+      - name: transaction_id
+        description: Unique identifier for each transaction (carried from stg_transactions).
+        tests:
+          - not_null
+          - unique
+
+      - name: account_id
+        description: Foreign key to stg_accounts.
+        tests:
+          - not_null
+
+      - name: customer_id
+        description: Foreign key to stg_customers.
+        tests:
+          - not_null
+
+      - name: org_id
+        description: Foreign key to stg_organizations.
+        tests:
+          - not_null
+
+      - name: transaction_date
+        description: Calendar date of the transaction.
+        tests:
+          - not_null
+
+      - name: amount
+        description: Monetary value — must never be zero.
+        tests:
+          - not_null
+
+      - name: currency_code
+        description: ISO 4217 currency code.
+        tests:
+          - not_null
+
+      - name: account_type
+        description: >
+          Enriched from stg_accounts. Non-null confirms the LEFT JOIN resolved
+          successfully (i.e., no orphan transaction_ids).
+        tests:
+          - not_null:
+              config:
+                severity: warn
+                alias: int_transactions_enriched_account_type_not_null
+
+      - name: account_category
+        description: >
+          Enriched from stg_accounts. Subcategory of account_type.
+        tests:
+          - not_null:
+              config:
+                severity: warn
+                alias: int_transactions_enriched_account_category_not_null

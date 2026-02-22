@@ -1,0 +1,26 @@
+# dbt
+target/
+dbt_packages/
+logs/
+
+# DuckDB database file(s)
+*.duckdb
+finance.duckdb
+
+# Docs folder (lineage/LinkedIn brief — keep local)
+docs/
+
+# Python / venv
+.dbt_env/
+*.pyc
+__pycache__/
+.venv/
+venv/
+env/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo

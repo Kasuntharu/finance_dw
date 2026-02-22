@@ -1,0 +1,7 @@
+finance_dw:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: 'finance.duckdb'
+      threads: 4
